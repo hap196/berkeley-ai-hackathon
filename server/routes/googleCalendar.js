@@ -124,13 +124,32 @@ router.get('/events', requireAuth, async (req, res) => {
 
     const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
 
-    // Get date parameter
-    const date = req.query.date || new Date().toISOString().split('T')[0];
-    const timeMin = new Date(`${date}T00:00:00.000Z`).toISOString();
-    const timeMax = new Date(`${date}T23:59:59.999Z`).toISOString();
+    // Get date parameter and user's timezone offset
+    const date = req.query.date || (() => {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    })();
+    const timezoneOffset = req.query.timezoneOffset ? parseInt(req.query.timezoneOffset) : new Date().getTimezoneOffset();
+    
+    const [year, month, day] = date.split('-').map(Number);
+    const localMidnight = new Date(year, month - 1, day);
+    
+    const utcStart = new Date(localMidnight.getTime() + (timezoneOffset * 60 * 1000));
+    const utcEnd = new Date(utcStart.getTime() + (24 * 60 * 60 * 1000) - 1);
+    
+    const timeMin = utcStart.toISOString();
+    const timeMax = utcEnd.toISOString();
 
-    // Get all calendars
     const calendarList = await calendar.calendarList.list();
+    
+    console.log('Available calendars:', calendarList.data.items.map(cal => ({
+      id: cal.id,
+      summary: cal.summary,
+      primary: cal.primary
+    })));
 
     const calendarPromises = calendarList.data.items.map(async (cal) => {
       try {
@@ -150,9 +169,14 @@ router.get('/events', requireAuth, async (req, res) => {
       }
     });
 
-    // **OPTIMIZATION: Wait for all calendars to be processed in parallel**
     const calendarResults = await Promise.all(calendarPromises);
-    const allEvents = calendarResults.flat(); // Flatten all events into one array
+    const allEvents = calendarResults.flat();
+    
+    console.log('Total events found:', allEvents.length);
+    console.log('Events by calendar:', calendarResults.map((events, index) => ({
+      calendar: calendarList.data.items[index].summary,
+      eventCount: events.length
+    })));
     
     const formattedEvents = allEvents.map(event => ({
       id: event.id,

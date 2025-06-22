@@ -35,11 +35,22 @@ export function GoogleCalendarIntegration({ onConnectionChange, onAccountChange,
   const [connecting, setConnecting] = useState(false);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    const day = today.getDate();
+    return new Date(year, month, day);
+  });
 
   const getCachedEvents = (date: Date): CalendarEvent[] | null => {
     try {
-      const dateKey = date.toISOString().split('T')[0];
+      // Format date as YYYY-MM-DD in local timezone to match our API calls
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const dateKey = `${year}-${month}-${day}`;
+      
       const cached = localStorage.getItem(CACHE_KEY_PREFIX + dateKey);
       if (cached) {
         const { events, timestamp }: CacheData = JSON.parse(cached);
@@ -55,7 +66,11 @@ export function GoogleCalendarIntegration({ onConnectionChange, onAccountChange,
 
   const setCachedEvents = (events: CalendarEvent[], date: Date) => {
     try {
-      const dateKey = date.toISOString().split('T')[0];
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const dateKey = `${year}-${month}-${day}`;
+      
       const cacheData: CacheData = {
         events,
         timestamp: Date.now()
@@ -126,9 +141,14 @@ export function GoogleCalendarIntegration({ onConnectionChange, onAccountChange,
 
     setEventsLoading(true);
     try {
-      const dateStr = date.toISOString().split('T')[0];
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+      
+      const timezoneOffset = date.getTimezoneOffset();
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/google-calendar/events?date=${dateStr}`,
+        `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/google-calendar/events?date=${dateStr}&timezoneOffset=${timezoneOffset}`,
         { credentials: 'include' }
       );
       
@@ -156,6 +176,17 @@ export function GoogleCalendarIntegration({ onConnectionChange, onAccountChange,
 
   useEffect(() => {
     checkConnectionStatus();
+    
+    const timezoneVersion = localStorage.getItem('calendar_timezone_version');
+    if (timezoneVersion !== '2.0') {
+      const keys = Object.keys(localStorage);
+      keys.forEach(key => {
+        if (key.startsWith(CACHE_KEY_PREFIX)) {
+          localStorage.removeItem(key);
+        }
+      });
+      localStorage.setItem('calendar_timezone_version', '2.0');
+    }
     
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('connected') === 'google-calendar') {
