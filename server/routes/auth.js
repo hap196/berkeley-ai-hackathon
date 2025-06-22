@@ -4,13 +4,18 @@ const router = express.Router();
 
 // GitHub OAuth routes
 router.get('/github', 
-  passport.authenticate('github', { scope: ['user:email'] })
+  passport.authenticate('github', { 
+    scope: [
+      'user:email',
+      'repo',
+      'read:org'
+    ] 
+  })
 );
 
 router.get('/github/callback',
   passport.authenticate('github', { failureRedirect: '/login' }),
   (req, res) => {
-    // Successful authentication, redirect to dashboard
     res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5173'}/dashboard`);
   }
 );

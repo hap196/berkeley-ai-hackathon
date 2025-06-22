@@ -77,7 +77,7 @@ router.get('/repos', requireAuth, async (req, res) => {
   }
 });
 
-// Get GitHub issues for the authenticated user
+// Get GitHub issues
 router.get('/issues', requireAuth, async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
@@ -86,7 +86,6 @@ router.get('/issues', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'GitHub not connected' });
     }
 
-    // Get issues assigned to the user across all repositories
     const response = await axios.get('https://api.github.com/issues', {
       headers: {
         'Authorization': `token ${user.accessToken}`,
@@ -96,7 +95,7 @@ router.get('/issues', requireAuth, async (req, res) => {
         filter: 'assigned',
         state: 'open',
         sort: 'updated',
-        per_page: 15
+        per_page: 20
       }
     });
 
@@ -141,7 +140,7 @@ router.get('/issues', requireAuth, async (req, res) => {
   }
 });
 
-// Get GitHub pull requests for the authenticated user
+// Get PRs
 router.get('/pull-requests', requireAuth, async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
@@ -150,21 +149,48 @@ router.get('/pull-requests', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'GitHub not connected' });
     }
 
-    // Search for pull requests created by the user
-    const response = await axios.get('https://api.github.com/search/issues', {
-      headers: {
-        'Authorization': `token ${user.accessToken}`,
-        'Accept': 'application/vnd.github.v3+json'
-      },
-      params: {
-        q: `type:pr author:${user.username} is:open`,
-        sort: 'updated',
-        order: 'desc',
-        per_page: 15
+    const searchPromises = [
+      axios.get('https://api.github.com/search/issues', {
+        headers: {
+          'Authorization': `token ${user.accessToken}`,
+          'Accept': 'application/vnd.github.v3+json'
+        },
+        params: {
+          q: `type:pr author:${user.username} is:open`,
+          sort: 'updated',
+          order: 'desc',
+          per_page: 20
+        }
+      }),
+      axios.get('https://api.github.com/search/issues', {
+        headers: {
+          'Authorization': `token ${user.accessToken}`,
+          'Accept': 'application/vnd.github.v3+json'
+        },
+        params: {
+          q: `type:pr involves:${user.username} is:open`,
+          sort: 'updated',
+          order: 'desc',
+          per_page: 20
+        }
+      })
+    ];
+
+    const responses = await Promise.all(searchPromises.map(p => p.catch(e => ({ data: { items: [] } }))));
+    
+    const allPRs = new Map();
+    
+    responses.forEach(response => {
+      if (response.data && response.data.items) {
+        response.data.items.forEach(pr => {
+          if (pr.user.login === user.username) {
+            allPRs.set(pr.id, pr);
+          }
+        });
       }
     });
 
-    const pullRequests = response.data.items.map(pr => ({
+    const pullRequests = Array.from(allPRs.values()).map(pr => ({
       id: pr.id,
       number: pr.number,
       title: pr.title,
@@ -189,6 +215,8 @@ router.get('/pull-requests', requireAuth, async (req, res) => {
       commentsCount: pr.comments,
       isDraft: pr.draft
     }));
+
+    pullRequests.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 
     res.json({ pullRequests });
   } catch (error) {

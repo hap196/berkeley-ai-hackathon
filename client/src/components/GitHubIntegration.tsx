@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { SiGithub } from 'react-icons/si';
 import { ExternalLink, GitPullRequest, AlertCircle, Calendar, MessageCircle } from 'lucide-react';
 
@@ -199,6 +199,13 @@ export function GitHubIntegration({ onConnectionChange, onAccountChange }: GitHu
 
   useEffect(() => {
     checkConnectionStatus();
+    
+    const scopeVersion = localStorage.getItem('github_scope_version');
+    if (scopeVersion !== '2.0') {
+      localStorage.removeItem(ISSUES_CACHE_KEY);
+      localStorage.removeItem(PRS_CACHE_KEY);
+      localStorage.setItem('github_scope_version', '2.0');
+    }
   }, []);
 
   useEffect(() => {

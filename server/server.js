@@ -11,6 +11,7 @@ const passport = require("passport");
 const authRoutes = require("./routes/auth");
 const googleCalendarRoutes = require("./routes/googleCalendar");
 const gmailRoutes = require("./routes/gmail");
+const githubRoutes = require("./routes/github");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -52,6 +53,7 @@ connectDB();
 app.use("/auth", authRoutes);
 app.use("/api/google-calendar", googleCalendarRoutes);
 app.use("/api/gmail", gmailRoutes);
+app.use("/api/github", githubRoutes);
 
 app.get("/", (req, res) => {
   res.send("<h1>Hello from Express!</h1>");
