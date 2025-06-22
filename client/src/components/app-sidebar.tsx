@@ -18,13 +18,18 @@ import {
 } from "@/components/ui/sidebar"
 import { Switch } from "@/components/ui/switch"
 
+interface User {
+  id: string
+  githubId: string
+  username: string
+  displayName: string
+  email: string
+  avatarUrl: string
+  profileUrl: string
+}
+
 // This is sample data
 const data = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
   navMain: [
     {
       title: "Inbox",
@@ -141,12 +146,22 @@ const data = {
   ],
 }
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function AppSidebar({ 
+  user, 
+  ...props 
+}: React.ComponentProps<typeof Sidebar> & { user: User }) {
   // Note: I'm using state to show active item.
   // IRL you should use the url/router.
   const [activeItem, setActiveItem] = React.useState(data.navMain[0])
   const [mails, setMails] = React.useState(data.mails)
   const { setOpen } = useSidebar()
+
+  // Transform user data for NavUser component
+  const navUserData = {
+    name: user.displayName,
+    email: user.email,
+    avatar: user.avatarUrl
+  }
 
   return (
     <Sidebar
@@ -170,8 +185,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     <Command className="size-4" />
                   </div>
                   <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-medium">Acme Inc</span>
-                    <span className="truncate text-xs">Enterprise</span>
+                    <span className="truncate font-medium">TaskFlow</span>
+                    <span className="truncate text-xs">Productivity Suite</span>
                   </div>
                 </a>
               </SidebarMenuButton>
@@ -213,7 +228,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </SidebarGroup>
         </SidebarContent>
         <SidebarFooter>
-          <NavUser user={data.user} />
+          <NavUser user={navUserData} />
         </SidebarFooter>
       </Sidebar>
 
