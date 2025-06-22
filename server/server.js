@@ -6,10 +6,12 @@ require("dotenv").config();
 
 // Import passport configuration
 require("./config/passport");
+require("./config/googlePassport");
 const passport = require("passport");
 
 // Import routes
 const authRoutes = require("./routes/auth");
+const googleCalendarRoutes = require("./routes/googleCalendar");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -54,6 +56,7 @@ connectDB();
 
 // Routes
 app.use("/auth", authRoutes);
+app.use("/api/google-calendar", googleCalendarRoutes);
 
 // Define a simple route for the root URL
 app.get("/", (req, res) => {
