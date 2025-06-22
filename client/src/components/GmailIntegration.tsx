@@ -21,6 +21,15 @@ interface GmailEmail {
   isImportant: boolean;
 }
 
+// **OPTIMIZATION: Add client-side caching**
+const CACHE_KEY = 'gmail_emails_cache';
+const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes
+
+interface CacheData {
+  emails: GmailEmail[];
+  timestamp: number;
+}
+
 export function GmailIntegration({ onConnectionChange, onAccountChange, onDisconnectRequest }: GmailIntegrationProps) {
   const [isConnected, setIsConnected] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
@@ -28,6 +37,34 @@ export function GmailIntegration({ onConnectionChange, onAccountChange, onDiscon
   const [connecting, setConnecting] = useState(false);
   const [emails, setEmails] = useState<GmailEmail[]>([]);
   const [emailsLoading, setEmailsLoading] = useState(false);
+
+  const getCachedEmails = (): GmailEmail[] | null => {
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const { emails, timestamp }: CacheData = JSON.parse(cached);
+        if (Date.now() - timestamp < CACHE_DURATION) {
+          return emails;
+        }
+      }
+    } catch (error) {
+      console.error('Error reading email cache:', error);
+    }
+    return null;
+  };
+
+  // **OPTIMIZATION: Store emails in cache**
+  const setCachedEmails = (emails: GmailEmail[]) => {
+    try {
+      const cacheData: CacheData = {
+        emails,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+    } catch (error) {
+      console.error('Error storing email cache:', error);
+    }
+  };
 
   const checkConnectionStatus = async () => {
     try {
@@ -65,6 +102,7 @@ export function GmailIntegration({ onConnectionChange, onAccountChange, onDiscon
         setIsConnected(false);
         setEmail(null);
         setEmails([]);
+        localStorage.removeItem(CACHE_KEY);
         onConnectionChange?.(false);
       }
     } catch (error) {
@@ -75,6 +113,12 @@ export function GmailIntegration({ onConnectionChange, onAccountChange, onDiscon
   const fetchEmails = async () => {
     if (!isConnected) return;
     
+    const cachedEmails = getCachedEmails();
+    if (cachedEmails) {
+      setEmails(cachedEmails);
+      return;
+    }
+
     setEmailsLoading(true);
     try {
       const response = await fetch(
@@ -85,10 +129,11 @@ export function GmailIntegration({ onConnectionChange, onAccountChange, onDiscon
       if (response.ok) {
         const data = await response.json();
         setEmails(data.emails);
+        setCachedEmails(data.emails);
       } else if (response.status === 401) {
-        // Token expired, need to reconnect
         setIsConnected(false);
         setEmail(null);
+        localStorage.removeItem(CACHE_KEY);
         onConnectionChange?.(false);
       }
     } catch (error) {
@@ -169,7 +214,7 @@ export function GmailIntegration({ onConnectionChange, onAccountChange, onDiscon
     );
   }
 
-  if (emailsLoading) {
+  if (emailsLoading && emails.length === 0) {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="text-sm text-muted-foreground">Loading emails...</div>
@@ -179,6 +224,12 @@ export function GmailIntegration({ onConnectionChange, onAccountChange, onDiscon
 
   return (
     <div className="w-full overflow-hidden">
+      {emailsLoading && emails.length > 0 && (
+        <div className="px-4 py-2 text-xs text-muted-foreground border-b">
+          Refreshing emails...
+        </div>
+      )}
+      
       {emails.map((email) => (
         <div
           key={email.id}
@@ -200,7 +251,8 @@ export function GmailIntegration({ onConnectionChange, onAccountChange, onDiscon
           </div>
         </div>
       ))}
-      {emails.length === 0 && (
+
+      {emails.length === 0 && !emailsLoading && (
         <div className="flex items-center justify-center p-8">
           <div className="text-sm text-muted-foreground">No emails found</div>
         </div>

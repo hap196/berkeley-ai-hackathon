@@ -132,10 +132,7 @@ router.get('/events', requireAuth, async (req, res) => {
     // Get all calendars
     const calendarList = await calendar.calendarList.list();
 
-    // Fetch events from all calendars
-    let allEvents = [];
-    
-    for (const cal of calendarList.data.items) {
+    const calendarPromises = calendarList.data.items.map(async (cal) => {
       try {
         const response = await calendar.events.list({
           calendarId: cal.id,
@@ -146,12 +143,16 @@ router.get('/events', requireAuth, async (req, res) => {
           orderBy: 'startTime',
         });
 
-        const events = response.data.items || [];
-        allEvents.push(...events);
+        return response.data.items || [];
       } catch (error) {
-        // Continue with other calendars if one fails
+        console.log(`Error fetching events from calendar ${cal.id}:`, error.message);
+        return [];
       }
-    }
+    });
+
+    // **OPTIMIZATION: Wait for all calendars to be processed in parallel**
+    const calendarResults = await Promise.all(calendarPromises);
+    const allEvents = calendarResults.flat(); // Flatten all events into one array
     
     const formattedEvents = allEvents.map(event => ({
       id: event.id,

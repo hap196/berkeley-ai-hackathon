@@ -131,15 +131,14 @@ router.get('/emails', requireAuth, async (req, res) => {
     });
 
     const messageIds = listResponse.data.messages || [];
-    const emails = [];
-
-    // Get details for each email
-    for (const message of messageIds) {
+    
+    const emailPromises = messageIds.map(async (message) => {
       try {
         const messageResponse = await gmail.users.messages.get({
           userId: 'me',
           id: message.id,
-          format: 'full'
+          format: 'metadata',
+          metadataHeaders: ['Subject', 'From', 'Date']
         });
 
         const email = messageResponse.data;
@@ -158,7 +157,7 @@ router.get('/emails', requireAuth, async (req, res) => {
         const isRead = !email.labelIds?.includes('UNREAD');
         const isImportant = email.labelIds?.includes('IMPORTANT') || false;
 
-        emails.push({
+        return {
           id: email.id,
           subject,
           from: {
@@ -169,11 +168,15 @@ router.get('/emails', requireAuth, async (req, res) => {
           date: new Date(date).toISOString(),
           isRead,
           isImportant
-        });
+        };
       } catch (error) {
         console.log(`Error fetching email ${message.id}:`, error.message);
+        return null;
       }
-    }
+    });
+
+    const emailResults = await Promise.all(emailPromises);
+    const emails = emailResults.filter(email => email !== null);
 
     res.json({ emails });
   } catch (error) {
