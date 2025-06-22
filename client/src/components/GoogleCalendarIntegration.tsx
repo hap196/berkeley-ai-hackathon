@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { SiGooglecalendar } from 'react-icons/si';
 import { CalendarDayView } from './CalendarDayView';
 
 interface GoogleCalendarIntegrationProps {
   onConnectionChange?: (connected: boolean) => void;
+  onAccountChange?: (account: { email: string; connected: boolean } | null) => void;
+  onDisconnectRequest?: (disconnectFn: () => Promise<void>) => void;
 }
 
 interface CalendarEvent {
@@ -18,7 +20,7 @@ interface CalendarEvent {
   color?: string;
 }
 
-export function GoogleCalendarIntegration({ onConnectionChange }: GoogleCalendarIntegrationProps) {
+export function GoogleCalendarIntegration({ onConnectionChange, onAccountChange, onDisconnectRequest }: GoogleCalendarIntegrationProps) {
   const [isConnected, setIsConnected] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,7 +53,7 @@ export function GoogleCalendarIntegration({ onConnectionChange }: GoogleCalendar
     window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/google-calendar/connect`;
   };
 
-  const handleDisconnect = async () => {
+  const handleDisconnect = useCallback(async () => {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/google-calendar/disconnect`, {
         method: 'POST',
@@ -67,7 +69,7 @@ export function GoogleCalendarIntegration({ onConnectionChange }: GoogleCalendar
     } catch (error) {
       console.error('Error disconnecting Google Calendar:', error);
     }
-  };
+  }, [onConnectionChange]);
 
   const fetchCalendarEvents = async (date?: Date) => {
     if (!isConnected) return;
@@ -113,6 +115,20 @@ export function GoogleCalendarIntegration({ onConnectionChange }: GoogleCalendar
       fetchCalendarEvents();
     }
   }, [isConnected]);
+
+  useEffect(() => {
+    if (isConnected && email) {
+      onAccountChange?.({ email, connected: true });
+    } else {
+      onAccountChange?.(null);
+    }
+  }, [isConnected, email, onAccountChange]);
+  
+  useEffect(() => {
+    if (onDisconnectRequest) {
+      onDisconnectRequest(handleDisconnect);
+    }
+  }, [handleDisconnect, onDisconnectRequest]);
 
   if (loading) {
     return (

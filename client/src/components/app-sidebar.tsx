@@ -12,6 +12,15 @@ import {
 import { NavUser } from "@/components/nav-user"
 import { GoogleCalendarIntegration } from "@/components/GoogleCalendarIntegration"
 import { Label } from "@/components/ui/label"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   Sidebar,
   SidebarContent,
@@ -19,7 +28,6 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarHeader,
-  SidebarInput,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -133,18 +141,38 @@ export function AppSidebar({
   user, 
   ...props 
 }: React.ComponentProps<typeof Sidebar> & { user: User }) {
-  // Note: I'm using state to show active item.
-  // IRL you should use the url/router.
   const [activeItem, setActiveItem] = React.useState(data.navMain[0])
   const [mails, setMails] = React.useState(data.mails)
+  const [googleAccount, setGoogleAccount] = React.useState<{ email: string; connected: boolean } | null>(null)
+  const [googleDisconnect, setGoogleDisconnect] = React.useState<(() => Promise<void>) | null>(null)
   const { setOpen } = useSidebar()
 
-  // Transform user data for NavUser component
   const navUserData = {
     name: user.displayName,
     email: user.email,
     avatar: user.avatarUrl
   }
+
+  const getInitials = (email: string) => {
+    return email.charAt(0).toUpperCase()
+  }
+
+  const handleGoogleDisconnect = React.useCallback(async () => {
+    if (googleDisconnect) {
+      await googleDisconnect()
+      setGoogleAccount(null)
+      setGoogleDisconnect(null)
+    }
+  }, [googleDisconnect])
+
+  // Memoize callback functions to prevent infinite re-renders
+  const handleAccountChange = React.useCallback((account: { email: string; connected: boolean } | null) => {
+    setGoogleAccount(account)
+  }, [])
+
+  const handleDisconnectRequest = React.useCallback((disconnectFn: () => Promise<void>) => {
+    setGoogleDisconnect(() => disconnectFn)
+  }, [])
 
   return (
     <Sidebar
@@ -153,8 +181,6 @@ export function AppSidebar({
       {...props}
     >
       {/* This is the first sidebar */}
-      {/* We disable collapsible and adjust width to icon. */}
-      {/* This will make the sidebar appear as icons. */}
       <Sidebar
         collapsible="none"
         className="w-[calc(var(--sidebar-width-icon)+1px)]! border-r"
@@ -216,25 +242,57 @@ export function AppSidebar({
       </Sidebar>
 
       {/* This is the second sidebar */}
-      {/* We disable collapsible and let it fill remaining space */}
       <Sidebar collapsible="none" className="hidden flex-1 md:flex">
         <SidebarHeader className="gap-3.5 border-b p-4">
           <div className="flex w-full items-center justify-between">
             <div className="text-foreground text-base font-medium">
               {activeItem?.title}
             </div>
-            <Label className="flex items-center gap-2 text-sm">
-              <span>Connected</span>
-              <Switch className="shadow-none" />
-            </Label>
+            {activeItem?.title === "Google Calendar" && googleAccount ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="h-8 w-8 rounded-full p-0">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage 
+                        src={`https://unavatar.io/${googleAccount.email}`} 
+                        alt={googleAccount.email}
+                      />
+                      <AvatarFallback className="bg-blue-500 text-white text-xs">
+                        {getInitials(googleAccount.email)}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <div className="px-2 py-1.5">
+                    <p className="text-sm font-medium">Google Calendar</p>
+                    <p className="text-xs text-muted-foreground">{googleAccount.email}</p>
+                  </div>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    className="text-red-600 focus:text-red-600"
+                    onClick={handleGoogleDisconnect}
+                  >
+                    Disconnect account
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Label className="flex items-center gap-2 text-sm">
+                <span>Connected</span>
+                <Switch className="shadow-none" />
+              </Label>
+            )}
           </div>
-          <SidebarInput placeholder="Search integrations..." />
         </SidebarHeader>
         <SidebarContent>
           <SidebarGroup className="px-0">
             <SidebarGroupContent>
               {activeItem?.title === "Google Calendar" ? (
-                <GoogleCalendarIntegration />
+                <GoogleCalendarIntegration 
+                  onAccountChange={handleAccountChange}
+                  onDisconnectRequest={handleDisconnectRequest}
+                />
               ) : (
                 <>
                   {mails.map((mail) => (
