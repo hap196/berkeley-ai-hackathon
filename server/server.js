@@ -12,6 +12,7 @@ const authRoutes = require("./routes/auth");
 const googleCalendarRoutes = require("./routes/googleCalendar");
 const gmailRoutes = require("./routes/gmail");
 const githubRoutes = require("./routes/github");
+const slackRoutes = require("./routes/slack");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -54,6 +55,7 @@ app.use("/auth", authRoutes);
 app.use("/api/google-calendar", googleCalendarRoutes);
 app.use("/api/gmail", gmailRoutes);
 app.use("/api/github", githubRoutes);
+app.use("/api/slack", slackRoutes);
 
 app.get("/", (req, res) => {
   res.send("<h1>Hello from Express!</h1>");

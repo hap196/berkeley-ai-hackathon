@@ -13,6 +13,7 @@ import { NavUser } from "@/components/nav-user"
 import { GoogleCalendarIntegration } from "@/components/GoogleCalendarIntegration"
 import { GmailIntegration } from "@/components/GmailIntegration"
 import { GitHubIntegration } from "@/components/GitHubIntegration"
+import { SlackIntegration } from "@/components/SlackIntegration"
 import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -150,6 +151,8 @@ export function AppSidebar({
   const [gmailAccount, setGmailAccount] = React.useState<{ email: string; connected: boolean } | null>(null)
   const [gmailDisconnect, setGmailDisconnect] = React.useState<(() => Promise<void>) | null>(null)
   const [githubAccount, setGithubAccount] = React.useState<{ username: string; connected: boolean } | null>(null)
+  const [slackAccount, setSlackAccount] = React.useState<{ username: string; teamName: string; connected: boolean } | null>(null)
+  const [slackDisconnect, setSlackDisconnect] = React.useState<(() => Promise<void>) | null>(null)
   const { setOpen } = useSidebar()
 
   const navUserData = {
@@ -196,6 +199,22 @@ export function AppSidebar({
 
   const handleGithubAccountChange = React.useCallback((account: { username: string; connected: boolean } | null) => {
     setGithubAccount(account)
+  }, [])
+
+  const handleSlackDisconnect = React.useCallback(async () => {
+    if (slackDisconnect) {
+      await slackDisconnect()
+      setSlackAccount(null)
+      setSlackDisconnect(null)
+    }
+  }, [slackDisconnect])
+
+  const handleSlackAccountChange = React.useCallback((account: { username: string; teamName: string; connected: boolean } | null) => {
+    setSlackAccount(account)
+  }, [])
+
+  const handleSlackDisconnectRequest = React.useCallback((disconnectFn: () => Promise<void>) => {
+    setSlackDisconnect(() => disconnectFn)
   }, [])
 
   return (
@@ -274,7 +293,8 @@ export function AppSidebar({
             </div>
             {(activeItem?.title === "Google Calendar" && googleAccount) || 
              (activeItem?.title === "Gmail" && gmailAccount) ||
-             (activeItem?.title === "GitHub" && githubAccount) ? (
+             (activeItem?.title === "GitHub" && githubAccount) ||
+             (activeItem?.title === "Slack" && slackAccount) ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="h-8 w-8 rounded-full p-0">
@@ -283,19 +303,22 @@ export function AppSidebar({
                         src={`https://unavatar.io/${
                           activeItem?.title === "Google Calendar" ? googleAccount?.email : 
                           activeItem?.title === "Gmail" ? gmailAccount?.email :
-                          activeItem?.title === "GitHub" ? githubAccount?.username : ''
+                          activeItem?.title === "GitHub" ? githubAccount?.username :
+                          activeItem?.title === "Slack" ? slackAccount?.username : ''
                         }`} 
                         alt={
                           activeItem?.title === "Google Calendar" ? googleAccount?.email : 
                           activeItem?.title === "Gmail" ? gmailAccount?.email :
-                          activeItem?.title === "GitHub" ? githubAccount?.username : ''
+                          activeItem?.title === "GitHub" ? githubAccount?.username :
+                          activeItem?.title === "Slack" ? slackAccount?.username : ''
                         }
                       />
                       <AvatarFallback className="bg-blue-500 text-white text-xs">
                         {getInitials(
                           activeItem?.title === "Google Calendar" ? googleAccount?.email || '' : 
                           activeItem?.title === "Gmail" ? gmailAccount?.email || '' :
-                          activeItem?.title === "GitHub" ? githubAccount?.username || '' : ''
+                          activeItem?.title === "GitHub" ? githubAccount?.username || '' :
+                          activeItem?.title === "Slack" ? slackAccount?.username || '' : ''
                         )}
                       </AvatarFallback>
                     </Avatar>
@@ -307,7 +330,8 @@ export function AppSidebar({
                     <p className="text-xs text-muted-foreground">
                       {activeItem?.title === "Google Calendar" ? googleAccount?.email : 
                        activeItem?.title === "Gmail" ? gmailAccount?.email :
-                       activeItem?.title === "GitHub" ? githubAccount?.username : ''}
+                       activeItem?.title === "GitHub" ? githubAccount?.username :
+                       activeItem?.title === "Slack" ? `${slackAccount?.username} • ${slackAccount?.teamName}` : ''}
                     </p>
                   </div>
                   <DropdownMenuSeparator />
@@ -316,6 +340,7 @@ export function AppSidebar({
                     onClick={
                       activeItem?.title === "Google Calendar" ? handleGoogleDisconnect : 
                       activeItem?.title === "Gmail" ? handleGmailDisconnect :
+                      activeItem?.title === "Slack" ? handleSlackDisconnect :
                       () => {}
                     }
                   >
@@ -347,6 +372,11 @@ export function AppSidebar({
               ) : activeItem?.title === "GitHub" ? (
                 <GitHubIntegration 
                   onAccountChange={handleGithubAccountChange}
+                />
+              ) : activeItem?.title === "Slack" ? (
+                <SlackIntegration 
+                  onAccountChange={handleSlackAccountChange}
+                  onDisconnectRequest={handleSlackDisconnectRequest}
                 />
               ) : (
                 <>

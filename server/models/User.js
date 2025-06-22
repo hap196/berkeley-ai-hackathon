@@ -68,6 +68,31 @@ const userSchema = new mongoose.Schema({
     expiresAt: {
       type: Date
     }
+  },
+  // Slack integration
+  slack: {
+    connected: {
+      type: Boolean,
+      default: false
+    },
+    accessToken: {
+      type: String
+    },
+    teamId: {
+      type: String
+    },
+    teamName: {
+      type: String
+    },
+    userId: {
+      type: String
+    },
+    username: {
+      type: String
+    },
+    expiresAt: {
+      type: Date
+    }
   }
 }, {
   timestamps: true
