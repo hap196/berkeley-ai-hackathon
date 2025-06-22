@@ -129,18 +129,31 @@ router.get('/events', requireAuth, async (req, res) => {
     const timeMin = new Date(`${date}T00:00:00.000Z`).toISOString();
     const timeMax = new Date(`${date}T23:59:59.999Z`).toISOString();
 
-    const response = await calendar.events.list({
-      calendarId: 'primary',
-      timeMin: timeMin,
-      timeMax: timeMax,
-      maxResults: 50,
-      singleEvents: true,
-      orderBy: 'startTime',
-    });
+    // Get all calendars
+    const calendarList = await calendar.calendarList.list();
 
-    const events = response.data.items || [];
+    // Fetch events from all calendars
+    let allEvents = [];
     
-    const formattedEvents = events.map(event => ({
+    for (const cal of calendarList.data.items) {
+      try {
+        const response = await calendar.events.list({
+          calendarId: cal.id,
+          timeMin: timeMin,
+          timeMax: timeMax,
+          maxResults: 50,
+          singleEvents: true,
+          orderBy: 'startTime',
+        });
+
+        const events = response.data.items || [];
+        allEvents.push(...events);
+      } catch (error) {
+        // Continue with other calendars if one fails
+      }
+    }
+    
+    const formattedEvents = allEvents.map(event => ({
       id: event.id,
       title: event.summary || 'No title',
       start: event.start?.dateTime || event.start?.date,
