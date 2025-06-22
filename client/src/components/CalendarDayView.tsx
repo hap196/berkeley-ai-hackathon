@@ -44,8 +44,77 @@ export function CalendarDayView({
     };
   });
 
-  // Calculate event positioning
-  const getEventStyle = (event: CalendarEvent) => {
+  // Check if two events overlap
+  const eventsOverlap = (event1: CalendarEvent, event2: CalendarEvent) => {
+    if (event1.isAllDay || event2.isAllDay) return false;
+    
+    const start1 = new Date(event1.start);
+    const end1 = new Date(event1.end);
+    const start2 = new Date(event2.start);
+    const end2 = new Date(event2.end);
+    
+    return start1 < end2 && start2 < end1;
+  };
+
+  // Calculate overlapping groups and positions
+  const calculateEventLayout = () => {
+    const nonAllDayEvents = events.filter(event => !event.isAllDay);
+    const eventLayout = new Map();
+
+    const sortedEvents = [...nonAllDayEvents].sort((a, b) => 
+      new Date(a.start).getTime() - new Date(b.start).getTime()
+    );
+
+    const overlapGroups: CalendarEvent[][] = [];
+    
+    for (const event of sortedEvents) {
+      let addedToGroup = false;
+      
+      for (const group of overlapGroups) {
+        const overlapsWithGroup = group.some(groupEvent => eventsOverlap(event, groupEvent));
+        if (overlapsWithGroup) {
+          group.push(event);
+          addedToGroup = true;
+          break;
+        }
+      }
+      
+      if (!addedToGroup) {
+        overlapGroups.push([event]);
+      }
+    }
+
+    overlapGroups.forEach(group => {
+      const groupSize = group.length;
+      group.forEach((event, index) => {
+        if (groupSize === 1) {
+          eventLayout.set(event.id, {
+            column: index,
+            totalColumns: groupSize,
+            width: 100,
+            left: 0
+          });
+        } else {
+          const eventWidth = 70;
+          const offsetPerEvent = 30;
+          const adjustedWidth = Math.min(eventWidth, 100 - (index * offsetPerEvent));
+          
+          eventLayout.set(event.id, {
+            column: index,
+            totalColumns: groupSize,
+            width: adjustedWidth,
+            left: index * offsetPerEvent
+          });
+        }
+      });
+    });
+
+    return eventLayout;
+  };
+
+  const eventLayout = calculateEventLayout();
+
+  const getEventStyle = (event: CalendarEvent, eventIndex: number) => {
     const startTime = new Date(event.start);
     const endTime = new Date(event.end);
 
@@ -55,15 +124,33 @@ export function CalendarDayView({
     const top = Math.max(0, startHour * 60);
     const height = Math.max(30, (endHour - startHour) * 60);
 
+    const layout = eventLayout.get(event.id);
+    
+    if (!layout || event.isAllDay) {
+      return {
+        top: `${top}px`,
+        height: `${height}px`,
+        left: "0px",
+        right: "12px",
+      };
+    }
+
+    const widthPercent = layout.width;
+    const leftPercent = layout.left;
+    
+    const adjustedWidth = layout.left + layout.width >= 95 ? 
+      Math.max(30, 100 - layout.left - 3) : 
+      layout.width;
+
     return {
       top: `${top}px`,
       height: `${height}px`,
-      left: "8px",
-      right: "8px",
+      left: `${leftPercent}%`,
+      width: `${adjustedWidth}%`,
+      marginRight: "12px",
     };
   };
 
-  // Calculate current time
   const getCurrentTimePosition = () => {
     if (!isSameDay(currentTime, date)) return null;
 
@@ -77,7 +164,6 @@ export function CalendarDayView({
 
   const currentTimePosition = getCurrentTimePosition();
 
-  // Color mapping for events
   const getEventColor = (color: string) => {
     const colors = {
       default: "bg-blue-500",
@@ -157,15 +243,17 @@ export function CalendarDayView({
             )}
 
             {/* Events */}
-            {events.map((event) => {
-              const style = getEventStyle(event);
+            {events.map((event, index) => {
+              const style = getEventStyle(event, index);
               const colorClass = getEventColor(event.color || "default");
+              const layout = eventLayout.get(event.id);
+              const zIndex = layout ? 20 + layout.column : 20;
 
               return (
                 <div
                   key={event.id}
-                  className={`absolute z-20 rounded px-2 py-1 text-white text-xs cursor-pointer transition-all hover:shadow-lg ${colorClass}`}
-                  style={style}
+                  className={`absolute rounded px-2 py-1 text-white text-xs cursor-pointer transition-all hover:shadow-lg ${colorClass}`}
+                  style={{...style, zIndex}}
                   title={`${event.title}\n${event.description || ""}\n${
                     event.location || ""
                   }`}

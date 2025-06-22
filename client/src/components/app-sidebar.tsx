@@ -11,6 +11,7 @@ import {
 
 import { NavUser } from "@/components/nav-user"
 import { GoogleCalendarIntegration } from "@/components/GoogleCalendarIntegration"
+import { GmailIntegration } from "@/components/GmailIntegration"
 import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -145,6 +146,8 @@ export function AppSidebar({
   const [mails, setMails] = React.useState(data.mails)
   const [googleAccount, setGoogleAccount] = React.useState<{ email: string; connected: boolean } | null>(null)
   const [googleDisconnect, setGoogleDisconnect] = React.useState<(() => Promise<void>) | null>(null)
+  const [gmailAccount, setGmailAccount] = React.useState<{ email: string; connected: boolean } | null>(null)
+  const [gmailDisconnect, setGmailDisconnect] = React.useState<(() => Promise<void>) | null>(null)
   const { setOpen } = useSidebar()
 
   const navUserData = {
@@ -165,13 +168,28 @@ export function AppSidebar({
     }
   }, [googleDisconnect])
 
-  // Memoize callback functions to prevent infinite re-renders
+  const handleGmailDisconnect = React.useCallback(async () => {
+    if (gmailDisconnect) {
+      await gmailDisconnect()
+      setGmailAccount(null)
+      setGmailDisconnect(null)
+    }
+  }, [gmailDisconnect])
+
   const handleAccountChange = React.useCallback((account: { email: string; connected: boolean } | null) => {
     setGoogleAccount(account)
   }, [])
 
   const handleDisconnectRequest = React.useCallback((disconnectFn: () => Promise<void>) => {
     setGoogleDisconnect(() => disconnectFn)
+  }, [])
+
+  const handleGmailAccountChange = React.useCallback((account: { email: string; connected: boolean } | null) => {
+    setGmailAccount(account)
+  }, [])
+
+  const handleGmailDisconnectRequest = React.useCallback((disconnectFn: () => Promise<void>) => {
+    setGmailDisconnect(() => disconnectFn)
   }, [])
 
   return (
@@ -248,30 +266,33 @@ export function AppSidebar({
             <div className="text-foreground text-base font-medium">
               {activeItem?.title}
             </div>
-            {activeItem?.title === "Google Calendar" && googleAccount ? (
+            {(activeItem?.title === "Google Calendar" && googleAccount) || 
+             (activeItem?.title === "Gmail" && gmailAccount) ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="h-8 w-8 rounded-full p-0">
                     <Avatar className="h-8 w-8">
                       <AvatarImage 
-                        src={`https://unavatar.io/${googleAccount.email}`} 
-                        alt={googleAccount.email}
+                        src={`https://unavatar.io/${activeItem?.title === "Google Calendar" ? googleAccount?.email : gmailAccount?.email}`} 
+                        alt={activeItem?.title === "Google Calendar" ? googleAccount?.email : gmailAccount?.email}
                       />
                       <AvatarFallback className="bg-blue-500 text-white text-xs">
-                        {getInitials(googleAccount.email)}
+                        {getInitials(activeItem?.title === "Google Calendar" ? googleAccount?.email || '' : gmailAccount?.email || '')}
                       </AvatarFallback>
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
                   <div className="px-2 py-1.5">
-                    <p className="text-sm font-medium">Google Calendar</p>
-                    <p className="text-xs text-muted-foreground">{googleAccount.email}</p>
+                    <p className="text-sm font-medium">{activeItem?.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {activeItem?.title === "Google Calendar" ? googleAccount?.email : gmailAccount?.email}
+                    </p>
                   </div>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem 
                     className="text-red-600 focus:text-red-600"
-                    onClick={handleGoogleDisconnect}
+                    onClick={activeItem?.title === "Google Calendar" ? handleGoogleDisconnect : handleGmailDisconnect}
                   >
                     Disconnect account
                   </DropdownMenuItem>
@@ -292,6 +313,11 @@ export function AppSidebar({
                 <GoogleCalendarIntegration 
                   onAccountChange={handleAccountChange}
                   onDisconnectRequest={handleDisconnectRequest}
+                />
+              ) : activeItem?.title === "Gmail" ? (
+                <GmailIntegration 
+                  onAccountChange={handleGmailAccountChange}
+                  onDisconnectRequest={handleGmailDisconnectRequest}
                 />
               ) : (
                 <>

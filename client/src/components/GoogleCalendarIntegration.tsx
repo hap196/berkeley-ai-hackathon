@@ -76,23 +76,29 @@ export function GoogleCalendarIntegration({ onConnectionChange, onAccountChange,
     
     setEventsLoading(true);
     try {
-      const dateParam = date ? date.toISOString().split('T')[0] : '';
+      // Use current date
+      const now = new Date();
+      const targetDate = date || new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const dateParam = targetDate.toISOString().split('T')[0];
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/google-calendar/events${dateParam ? `?date=${dateParam}` : ''}`,
+        `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/google-calendar/events?date=${dateParam}`,
         { credentials: 'include' }
       );
       
+      // console.log('Calendar events response status:', response.status);
+      
       if (response.ok) {
         const data = await response.json();
+        // console.log('Calendar events data:', data);
         setEvents(data.events);
-      } else if (response.status === 401) {
-        // Token expired, need to reconnect
-        setIsConnected(false);
-        setEmail(null);
-        onConnectionChange?.(false);
-      }
-    } catch (error) {
-      console.error('Error fetching calendar events:', error);
+              } else if (response.status === 401) {
+          // Token expired, need to reconnect
+          setIsConnected(false);
+          setEmail(null);
+          onConnectionChange?.(false);
+        }
+      } catch (error) {
+        console.error('Error fetching calendar events:', error);
     } finally {
       setEventsLoading(false);
     }

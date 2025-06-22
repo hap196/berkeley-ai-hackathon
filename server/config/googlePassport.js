@@ -5,7 +5,7 @@ const User = require('../models/User');
 passport.use('google-calendar', new GoogleStrategy({
   clientID: process.env.GOOGLE_CLIENT_ID,
   clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  callbackURL: process.env.GOOGLE_CALLBACK_URL || "http://localhost:3000/auth/google/calendar/callback"
+  callbackURL: process.env.GOOGLE_CALLBACK_URL || "http://localhost:3000/api/google-calendar/callback"
 },
 async (accessToken, refreshToken, profile, done) => {
   try {
@@ -17,6 +17,25 @@ async (accessToken, refreshToken, profile, done) => {
     });
   } catch (error) {
     console.error('Error in Google Calendar strategy:', error);
+    return done(error, null);
+  }
+}));
+
+passport.use('google-gmail', new GoogleStrategy({
+  clientID: process.env.GOOGLE_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  callbackURL: process.env.GOOGLE_GMAIL_CALLBACK_URL || "http://localhost:3000/api/gmail/callback"
+},
+async (accessToken, refreshToken, profile, done) => {
+  try {
+    return done(null, {
+      profile,
+      accessToken,
+      refreshToken,
+      isGoogleAuth: true
+    });
+  } catch (error) {
+    console.error('Error in Gmail strategy:', error);
     return done(error, null);
   }
 }));

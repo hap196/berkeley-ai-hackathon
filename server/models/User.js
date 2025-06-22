@@ -49,6 +49,25 @@ const userSchema = new mongoose.Schema({
     expiresAt: {
       type: Date
     }
+  },
+  // Gmail integration
+  gmail: {
+    connected: {
+      type: Boolean,
+      default: false
+    },
+    accessToken: {
+      type: String
+    },
+    refreshToken: {
+      type: String
+    },
+    email: {
+      type: String
+    },
+    expiresAt: {
+      type: Date
+    }
   }
 }, {
   timestamps: true
