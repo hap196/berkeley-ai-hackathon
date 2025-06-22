@@ -1,10 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { SiGooglecalendar } from 'react-icons/si';
-import { CheckCircle, AlertCircle, ExternalLink } from 'lucide-react';
+import { CalendarDayView } from './CalendarDayView';
 
 interface GoogleCalendarIntegrationProps {
   onConnectionChange?: (connected: boolean) => void;
+}
+
+interface CalendarEvent {
+  id: string;
+  title: string;
+  start: string;
+  end: string;
+  isAllDay: boolean;
+  description?: string;
+  location?: string;
+  color?: string;
 }
 
 export function GoogleCalendarIntegration({ onConnectionChange }: GoogleCalendarIntegrationProps) {
@@ -12,6 +23,8 @@ export function GoogleCalendarIntegration({ onConnectionChange }: GoogleCalendar
   const [email, setEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
 
   const checkConnectionStatus = async () => {
     try {
@@ -34,6 +47,7 @@ export function GoogleCalendarIntegration({ onConnectionChange }: GoogleCalendar
 
   const handleConnect = () => {
     setConnecting(true);
+    // Redirect to Google Calendar OAuth
     window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/google-calendar/connect`;
   };
 
@@ -47,6 +61,7 @@ export function GoogleCalendarIntegration({ onConnectionChange }: GoogleCalendar
       if (response.ok) {
         setIsConnected(false);
         setEmail(null);
+        setEvents([]);
         onConnectionChange?.(false);
       }
     } catch (error) {
@@ -54,9 +69,36 @@ export function GoogleCalendarIntegration({ onConnectionChange }: GoogleCalendar
     }
   };
 
+  const fetchCalendarEvents = async (date?: Date) => {
+    if (!isConnected) return;
+    
+    setEventsLoading(true);
+    try {
+      const dateParam = date ? date.toISOString().split('T')[0] : '';
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/google-calendar/events${dateParam ? `?date=${dateParam}` : ''}`,
+        { credentials: 'include' }
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        setEvents(data.events);
+      } else if (response.status === 401) {
+        // Token expired, need to reconnect
+        setIsConnected(false);
+        setEmail(null);
+        onConnectionChange?.(false);
+      }
+    } catch (error) {
+      console.error('Error fetching calendar events:', error);
+    } finally {
+      setEventsLoading(false);
+    }
+  };
+
   useEffect(() => {
     checkConnectionStatus();
-
+    
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('connected') === 'google-calendar') {
       setTimeout(() => {
@@ -66,6 +108,12 @@ export function GoogleCalendarIntegration({ onConnectionChange }: GoogleCalendar
     }
   }, []);
 
+  useEffect(() => {
+    if (isConnected) {
+      fetchCalendarEvents();
+    }
+  }, [isConnected]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -74,78 +122,28 @@ export function GoogleCalendarIntegration({ onConnectionChange }: GoogleCalendar
     );
   }
 
-  return (
-    <div className="p-6 space-y-6">
-      <div className="border rounded-lg p-4">
-        {isConnected ? (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-green-600">
-              <CheckCircle className="h-5 w-5" />
-              <span className="font-medium">Connected</span>
-            </div>
-            
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">
-                Connected account: <span className="font-medium text-foreground">{email}</span>
-              </p>
-              <p className="text-sm text-muted-foreground">
-                You can now view your calendar events and create new meetings directly from Orbit.
-              </p>
-            </div>
-
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={handleDisconnect}>
-                Disconnect
-              </Button>
-              <Button variant="outline" size="sm" asChild>
-                <a href="https://calendar.google.com" target="_blank" rel="noopener noreferrer">
-                  Open Google Calendar
-                  <ExternalLink className="h-3 w-3 ml-1" />
-                </a>
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-orange-600">
-              <AlertCircle className="h-5 w-5" />
-              <span className="font-medium">Not Connected</span>
-            </div>
-            
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">
-                Connect your Google Calendar to sync events and allow Orbit to create new meetings.
-              </p>
-            </div>
-
-            <Button 
-              onClick={handleConnect} 
-              disabled={connecting}
-              className="w-full sm:w-auto"
-            >
-              <SiGooglecalendar className="h-4 w-4 mr-2" />
-              {connecting ? 'Connecting...' : 'Connect Google Calendar'}
-            </Button>
-          </div>
-        )}
+  if (!isConnected) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Button 
+          onClick={handleConnect} 
+          disabled={connecting}
+          className="w-full sm:w-auto"
+        >
+          <SiGooglecalendar className="h-4 w-4 mr-2" />
+          {connecting ? 'Connecting...' : 'Connect Google Calendar'}
+        </Button>
       </div>
+    );
+  }
 
-      {isConnected && (
-        <div className="text-xs text-muted-foreground">
-          <p>
-            Orbit has permission to read your calendar events and create new events.
-            You can revoke this access anytime from your{' '}
-            <a 
-              href="https://myaccount.google.com/permissions" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="underline hover:text-foreground"
-            >
-              Google Account settings
-            </a>.
-          </p>
-        </div>
-      )}
-    </div>
-  );
+  if (eventsLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-sm text-muted-foreground">Loading calendar events...</div>
+      </div>
+    );
+  }
+
+  return <CalendarDayView events={events} />;
 } 

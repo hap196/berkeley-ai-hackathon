@@ -102,4 +102,65 @@ router.post('/disconnect', requireAuth, async (req, res) => {
   }
 });
 
+// Get calendar events for a specific date
+router.get('/events', requireAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    
+    if (!user.googleCalendar?.connected || !user.googleCalendar?.accessToken) {
+      return res.status(400).json({ error: 'Google Calendar not connected' });
+    }
+
+    const { google } = require('googleapis');
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET
+    );
+
+    oauth2Client.setCredentials({
+      access_token: user.googleCalendar.accessToken,
+      refresh_token: user.googleCalendar.refreshToken
+    });
+
+    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    // Get date parameter
+    const date = req.query.date || new Date().toISOString().split('T')[0];
+    const timeMin = new Date(`${date}T00:00:00.000Z`).toISOString();
+    const timeMax = new Date(`${date}T23:59:59.999Z`).toISOString();
+
+    const response = await calendar.events.list({
+      calendarId: 'primary',
+      timeMin: timeMin,
+      timeMax: timeMax,
+      maxResults: 50,
+      singleEvents: true,
+      orderBy: 'startTime',
+    });
+
+    const events = response.data.items || [];
+    
+    const formattedEvents = events.map(event => ({
+      id: event.id,
+      title: event.summary || 'No title',
+      start: event.start?.dateTime || event.start?.date,
+      end: event.end?.dateTime || event.end?.date,
+      isAllDay: !event.start?.dateTime,
+      description: event.description || '',
+      location: event.location || '',
+      color: event.colorId || 'default'
+    }));
+
+    res.json({ events: formattedEvents });
+  } catch (error) {
+    console.error('Error fetching calendar events:', error);
+    
+    if (error.code === 401) {
+      return res.status(401).json({ error: 'Authentication expired' });
+    }
+    
+    res.status(500).json({ error: 'Failed to fetch calendar events' });
+  }
+});
+
 module.exports = router; 
