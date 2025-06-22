@@ -41,6 +41,11 @@ export function NavUser({
 }) {
   const { isMobile } = useSidebar()
 
+  const handleLogout = () => {
+    // Redirect to backend logout endpoint
+    window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/auth/logout`;
+  }
+
   return (
     <SidebarMenu>
       <SidebarMenuItem>
@@ -102,7 +107,7 @@ export function NavUser({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={handleLogout}>
               <LogOut />
               Log out
             </DropdownMenuItem>
