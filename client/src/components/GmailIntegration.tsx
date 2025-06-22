@@ -182,7 +182,7 @@ export function GmailIntegration({ onConnectionChange, onAccountChange, onDiscon
       {emails.map((email) => (
         <div
           key={email.id}
-          className="flex flex-col gap-2 border-b p-4 text-sm leading-tight last:border-b-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground cursor-pointer min-w-0"
+          className="flex flex-col gap-2 border-b pl-4 pr-16 py-4 text-sm leading-tight last:border-b-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground cursor-pointer min-w-0"
         >
           <div className="flex items-center gap-2 min-w-0 w-full">
             <span className={`truncate flex-1 min-w-0 ${!email.isRead ? 'font-semibold' : ''}`}>
